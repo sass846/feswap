@@ -88,7 +88,7 @@ export function MapComponent({ stations, onStationClick, userLocation }: MapComp
       el.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
 
       const marker = new mapboxgl.Marker({ element: el })
-        .setLngLat([station.lng, station.lat])
+        .setLngLat([station.location.lng, station.location.lat])
         .addTo(map.current!);
 
       el.addEventListener('click', () => {
