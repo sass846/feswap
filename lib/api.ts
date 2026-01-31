@@ -1,11 +1,13 @@
 // API configuration for Go backend communication
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
-const WS_BASE_URL = (() => {
+
+// Safe WebSocket URL initialization that works on both client and server
+const getWSBaseURL = () => {
   if (typeof window === 'undefined') return 'ws://localhost:8000';
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   const host = process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/^https?:\/\//, '') || 'localhost:8000';
   return `${protocol}//${host}`;
-})();
+};
 
 export const API_ENDPOINTS = {
   // Auth endpoints (v1)
@@ -23,8 +25,10 @@ export const API_ENDPOINTS = {
   // Feedback endpoints
   feedback: `${API_BASE_URL}/api/v1/feedback`,
   
-  // WebSocket
-  ws: `${WS_BASE_URL}/ws`,
+  // WebSocket - use function to get URL lazily
+  get ws() {
+    return `${getWSBaseURL()}/ws`;
+  },
 };
 
 export class APIError extends Error {
