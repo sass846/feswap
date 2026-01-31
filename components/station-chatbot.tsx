@@ -7,11 +7,35 @@ import type { ChatMessage } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Send, Loader2 } from 'lucide-react';
+import { getStationById } from '@/lib/dummy-data';
 
 interface StationChatbotProps {
   stationId: string;
   stationName: string;
 }
+
+// Dummy AI responses based on user queries
+const getDummyChatResponse = (message: string, station: any): string => {
+  const lowerMessage = message.toLowerCase();
+  
+  if (lowerMessage.includes('battery') || lowerMessage.includes('available')) {
+    return `We currently have ${station.inventory.charged} charged batteries available at ${station.name}. Total capacity is ${station.inventory.total_slots} slots.`;
+  }
+  if (lowerMessage.includes('wait') || lowerMessage.includes('queue')) {
+    return `Current queue length is ${station.queue.length} people. Average wait time is approximately ${station.queue.avg_wait_time_min} minutes.`;
+  }
+  if (lowerMessage.includes('charger') || lowerMessage.includes('status')) {
+    const workingChargers = station.chargers.filter((c: any) => c.status === 'OK').length;
+    return `We have ${workingChargers} out of ${station.chargers.length} chargers operating normally.`;
+  }
+  if (lowerMessage.includes('hour') || lowerMessage.includes('busy')) {
+    return `This time of day is typically moderately busy. We're seeing steady flow with manageable wait times.`;
+  }
+  if (lowerMessage.includes('help') || lowerMessage.includes('?')) {
+    return `I can help you with: battery availability, current queue status, charger information, and wait time estimates. What would you like to know?`;
+  }
+  return `Thanks for your question! Based on current data, ${station.name} is operating normally with ${station.inventory.charged} batteries available. Is there anything specific you'd like to know?`;
+};
 
 export function StationChatbot({ stationId, stationName }: StationChatbotProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([
@@ -45,27 +69,15 @@ export function StationChatbot({ stationId, stationName }: StationChatbotProps) 
     setLoading(true);
 
     try {
-      // Call backend LangGraph chatbot endpoint
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000'}/chat`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            station_id: stationId,
-            message: userMessage.content,
-          }),
-        }
-      );
+      // Simulate API call with dummy data
+      await new Promise((resolve) => setTimeout(resolve, 600));
 
-      if (!response.ok) {
-        throw new Error('Failed to get response');
-      }
+      const station = getStationById(stationId);
+      const responseText = station ? getDummyChatResponse(inputValue, station) : 'I\'m unable to retrieve station information at the moment.';
 
-      const data = await response.json();
       const assistantMessage: ChatMessage = {
         role: 'assistant',
-        content: data.response,
+        content: responseText,
         timestamp: new Date(),
       };
 

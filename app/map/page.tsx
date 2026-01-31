@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/app/context/auth-context';
 import { MapComponent } from '@/components/map-component';
@@ -8,15 +8,12 @@ import { StationDetailsPopup } from '@/components/station-details-popup';
 import { RerouteSuggestion } from '@/components/reroute-suggestion';
 import { MapHeader } from '@/components/map-header';
 import { LoadingOverlay } from '@/components/loading-overlay';
-import type { Station, RerouteSuggestion as RerouteSuggestionType, StationState } from '@/lib/types';
-import { apiCall, API_ENDPOINTS, WebSocketManager } from '@/lib/api';
-
-const apiBaseUrl = API_ENDPOINTS.BASE_URL; // Declare apiBaseUrl here
+import type { Station, RerouteSuggestion as RerouteSuggestionType } from '@/lib/types';
+import { getAllStations } from '@/lib/dummy-data';
 
 export default function MapPage() {
   const router = useRouter();
-  const { user, token, logout } = useAuth();
-  const wsManagerRef = useRef<WebSocketManager | null>(null);
+  const { user, logout } = useAuth();
 
   const [stations, setStations] = useState<Station[]>([]);
   const [selectedStation, setSelectedStation] = useState<Station | null>(null);
@@ -45,119 +42,72 @@ export default function MapPage() {
     }
   }, []);
 
-  // Setup WebSocket connection and fetch initial stations
+  // Load dummy stations
   useEffect(() => {
-    if (!userLocation || !token) return;
+    if (!userLocation) return;
 
-    const fetchStations = async () => {
-      try {
-        setLoading(true);
-        const data = await apiCall<Station[]>(
-          `${API_ENDPOINTS.stations}?latitude=${userLocation.lat}&longitude=${userLocation.lng}&radius=15`,
-          {},
-          token
+    try {
+      setLoading(true);
+      // Load dummy stations
+      const allStations = getAllStations();
+      setStations(allStations);
+      setError('');
+      
+      // Simulate real-time updates with dummy data
+      const updateInterval = setInterval(() => {
+        setStations((prevStations) =>
+          prevStations.map((station) => ({
+            ...station,
+            timestamp: new Date().toISOString(),
+            inventory: {
+              ...station.inventory,
+              charged: Math.max(0, Math.min(station.inventory.total_slots, 
+                station.inventory.charged + (Math.random() > 0.6 ? 1 : Math.random() > 0.6 ? -1 : 0)
+              )),
+            },
+            queue: {
+              ...station.queue,
+              length: Math.max(0, station.queue.length + (Math.random() > 0.6 ? 1 : Math.random() > 0.6 ? -1 : 0)),
+            },
+          }))
         );
-        setStations(data);
-        setError('');
-      } catch (err) {
-        console.error('[v0] Fetch stations error:', err);
-        setError('Failed to load stations. Please try again.');
-      } finally {
-        setLoading(false);
-      }
-    };
+      }, 5000);
 
-    // Setup WebSocket for real-time updates
-    const setupWebSocket = async () => {
-      try {
-        wsManagerRef.current = new WebSocketManager(token);
-        await wsManagerRef.current.connect();
-        
-        // Listen for station state updates
-        wsManagerRef.current.subscribe('station.state', (data: StationState) => {
-          setStations((prevStations) => {
-            const index = prevStations.findIndex((s) => s.station_id === data.station_id);
-            if (index >= 0) {
-              const updated = [...prevStations];
-              updated[index] = { ...updated[index], ...data };
-              return updated;
-            }
-            return prevStations;
-          });
+      return () => clearInterval(updateInterval);
+    } catch (err) {
+      console.error('[v0] Fetch stations error:', err);
+      setError('Failed to load stations. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  }, [userLocation]);
 
-          // Update selected station if it changed
-          if (selectedStation?.station_id === data.station_id) {
-            setSelectedStation((prev) => (prev ? { ...prev, ...data } : prev));
-          }
-        });
-
-        // Listen for AI actions (reroute suggestions)
-        wsManagerRef.current.subscribe('langgraph.action', (action: any) => {
-          if (action.type === 'reroute' && action.metadata) {
-            const suggestion: RerouteSuggestionType = {
-              suggested_station_id: action.metadata.target_station,
-              reason: action.reasoning,
-              confidence: action.confidence,
-              estimated_time_minutes: action.metadata.estimated_time || 0,
-              wait_time_minutes: action.metadata.wait_time || 0,
-              total_time_minutes: (action.metadata.estimated_time || 0) + (action.metadata.wait_time || 0),
-            };
-            setReroute(suggestion);
-            const suggested = stations.find((s) => s.station_id === action.metadata.target_station);
-            if (suggested) {
-              setTargetStation(suggested);
-            }
-          }
-        });
-      } catch (err) {
-        console.error('[v0] WebSocket setup error:', err);
-      }
-    };
-
-    fetchStations();
-    setupWebSocket();
-
-    return () => {
-      if (wsManagerRef.current) {
-        wsManagerRef.current.disconnect();
-      }
-    };
-  }, [userLocation, token, selectedStation, stations]);
-
-  // Check for reroute suggestions when station is selected
+  // Mock reroute suggestion when station is selected
   useEffect(() => {
-    if (!selectedStation || !userLocation || !token) return;
+    if (!selectedStation || !userLocation || !stations.length) return;
 
-    const checkReroute = async () => {
-      try {
-        const suggestion = await apiCall<RerouteSuggestionType>(
-          API_ENDPOINTS.rerouteSuggestion(selectedStation.station_id),
-          {
-            method: 'POST',
-            body: JSON.stringify({
-              current_lat: userLocation.lat,
-              current_lng: userLocation.lng,
-            }),
-          },
-          token
-        );
+    // Generate a mock reroute suggestion with 30% chance
+    if (Math.random() > 0.7) {
+      const otherStations = stations.filter((s) => s.station_id !== selectedStation.station_id);
+      if (otherStations.length > 0) {
+        const suggestedStation = otherStations[Math.floor(Math.random() * otherStations.length)];
         
-        // Only show reroute if confidence is high and it's actually better
-        if (suggestion.confidence > 0.6 && suggestion.total_time_minutes < (selectedStation.queue.avg_wait_time_min || 15) + 15) {
+        // Only suggest if the suggested station has better availability
+        if (suggestedStation.queue.length < selectedStation.queue.length) {
+          const suggestion: RerouteSuggestionType = {
+            suggested_station_id: suggestedStation.station_id,
+            reason: `${suggestedStation.name} has a shorter queue and better availability`,
+            confidence: 0.75,
+            estimated_time_minutes: Math.floor(Math.random() * 8) + 5,
+            wait_time_minutes: suggestedStation.queue.avg_wait_time_min,
+            total_time_minutes: (Math.floor(Math.random() * 8) + 5) + suggestedStation.queue.avg_wait_time_min,
+          };
           setReroute(suggestion);
-          const suggested = stations.find((s) => s.station_id === suggestion.suggested_station_id);
-          if (suggested) {
-            setTargetStation(suggested);
-          }
+          setTargetStation(suggestedStation);
         }
-      } catch (err) {
-        console.error('[v0] Reroute check error:', err);
-        // Silently fail - not critical
       }
-    };
-
-    checkReroute();
-  }, [selectedStation, userLocation, token, stations]);
+    }
+  }, [selectedStation, userLocation, stations]);
 
   const handleAcceptReroute = () => {
     if (targetStation) {

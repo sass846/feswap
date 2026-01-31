@@ -28,32 +28,34 @@ export function StationFeedbackDialog({
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
-  const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!rating || !waitTime) return;
 
     setLoading(true);
     try {
-      const response = await fetch(`${apiBaseUrl}/feedback`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          station_id: stationId,
-          rating,
-          comment,
-          wait_time_actual: parseInt(waitTime),
-        }),
-      });
+      // Simulate API call with dummy data
+      await new Promise((resolve) => setTimeout(resolve, 800));
 
-      if (response.ok) {
-        setSubmitted(true);
-        setTimeout(() => {
-          onClose();
-          onSubmit?.();
-        }, 2000);
-      }
+      // Store feedback in localStorage for demo
+      const feedbackData = {
+        station_id: stationId,
+        rating,
+        comment,
+        wait_time_actual: parseInt(waitTime),
+        timestamp: new Date().toISOString(),
+      };
+
+      const existingFeedback = JSON.parse(localStorage.getItem('feedback') || '[]');
+      existingFeedback.push(feedbackData);
+      localStorage.setItem('feedback', JSON.stringify(existingFeedback));
+
+      console.log('[v0] Feedback stored:', feedbackData);
+      setSubmitted(true);
+      setTimeout(() => {
+        onClose();
+        onSubmit?.();
+      }, 2000);
     } catch (error) {
       console.error('[v0] Feedback submission error:', error);
     } finally {

@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import type { User } from '@/lib/types';
-import { apiCall, API_ENDPOINTS, APIError } from '@/lib/api';
+import { validateDummyLogin, generateMockToken } from '@/lib/dummy-data';
 
 interface AuthContextType {
   user: User | null;
@@ -38,20 +38,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setError(null);
     setLoading(true);
     try {
-      const data = await apiCall<{token: string; user: User}>(
-        API_ENDPOINTS.login,
-        {
-          method: 'POST',
-          body: JSON.stringify({ phone_number: phone, password }),
-        }
-      );
-      
-      setToken(data.token);
-      setUser(data.user);
-      localStorage.setItem('auth_token', data.token);
-      localStorage.setItem('auth_user', JSON.stringify(data.user));
+      // Simulate network delay
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
+      const validatedUser = validateDummyLogin(phone, password);
+      if (!validatedUser) {
+        throw new Error('Invalid credentials');
+      }
+
+      const mockToken = generateMockToken();
+      setToken(mockToken);
+      setUser(validatedUser);
+      localStorage.setItem('auth_token', mockToken);
+      localStorage.setItem('auth_user', JSON.stringify(validatedUser));
     } catch (err) {
-      const message = err instanceof APIError ? err.message : 'Login failed';
+      const message = err instanceof Error ? err.message : 'Login failed';
       setError(message);
       throw err;
     } finally {
@@ -63,25 +64,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setError(null);
     setLoading(true);
     try {
-      const data = await apiCall<{token: string; user: User}>(
-        API_ENDPOINTS.signup,
-        {
-          method: 'POST',
-          body: JSON.stringify({ 
-            phone_number: phone, 
-            password, 
-            name, 
-            vehicle_type: vehicleType 
-          }),
-        }
-      );
-      
-      setToken(data.token);
-      setUser(data.user);
-      localStorage.setItem('auth_token', data.token);
-      localStorage.setItem('auth_user', JSON.stringify(data.user));
+      // Simulate network delay
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
+      // For demo, accept any signup
+      const newUser: User = {
+        id: `user_${Date.now()}`,
+        phone_number: phone,
+        name,
+        vehicle_type: vehicleType,
+      };
+
+      const mockToken = generateMockToken();
+      setToken(mockToken);
+      setUser(newUser);
+      localStorage.setItem('auth_token', mockToken);
+      localStorage.setItem('auth_user', JSON.stringify(newUser));
     } catch (err) {
-      const message = err instanceof APIError ? err.message : 'Signup failed';
+      const message = err instanceof Error ? err.message : 'Signup failed';
       setError(message);
       throw err;
     } finally {
